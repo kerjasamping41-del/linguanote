@@ -47,11 +47,19 @@
     button:hover { background: #2c5282; }
     .pronounce-btn {
       background: #38a169 !important;
-      padding: 6px 12px !important;
+      padding: 6px 10px !important;
       font-size: 14px !important;
       width: auto !important;
       display: inline-block !important;
-      margin-left: 10px;
+      margin-left: 8px;
+    }
+    .delete-btn {
+      background: #e53e3e !important;
+      padding: 6px 10px !important;
+      font-size: 14px !important;
+      width: auto !important;
+      display: inline-block !important;
+      margin-left: 6px;
     }
     ul { list-style: none; }
     li {
@@ -76,13 +84,16 @@
       body { padding: 10px; }
       .card { padding: 16px; }
       #textInputSection { flex-direction: column; }
+      .pronounce-btn, .delete-btn {
+        margin: 4px 0 0 6px;
+      }
     }
   </style>
 </head>
 <body>
 
 <h1>📘 LinguaNote</h1>
-<p style="text-align:center; color:#718096;">Catat kata & latihan bahasa Inggris</p>
+<p style="text-align:center; color:#718096;">Catat, dengarkan, latihan, dan kelola kosakatamu!</p>
 
 <!-- Tambah Kata -->
 <div class="card">
@@ -116,7 +127,7 @@
 </div>
 
 <script>
-// === Data Kata ===
+// === Data Kosakata ===
 let vocabulary = JSON.parse(localStorage.getItem('vocabulary')) || [];
 
 // === Simpan Kata Baru ===
@@ -128,15 +139,26 @@ function addWord() {
     return;
   }
   vocabulary.push({ word, meaning });
-  // Urutkan A–Z (abaikan huruf besar/kecil)
   vocabulary.sort((a, b) => 
     a.word.toLowerCase().localeCompare(b.word.toLowerCase())
   );
-  localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
-  renderWordList();
-  // Kosongkan input
+  saveAndRender();
   document.getElementById('newWord').value = '';
   document.getElementById('wordMeaning').value = '';
+}
+
+// === Hapus Kata ===
+function deleteWord(index) {
+  if (confirm(`Yakin hapus kata: "${vocabulary[index].word}"?`)) {
+    vocabulary.splice(index, 1);
+    saveAndRender();
+  }
+}
+
+// === Simpan & Render Ulang ===
+function saveAndRender() {
+  localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
+  renderWordList();
 }
 
 // === Tampilkan Daftar Kata ===
@@ -146,15 +168,18 @@ function renderWordList() {
     list.innerHTML = '<li style="text-align:center;color:#a0aec0;">Belum ada kata tersimpan.</li>';
     return;
   }
-  list.innerHTML = vocabulary.map(item => `
+  list.innerHTML = vocabulary.map((item, index) => `
     <li>
       <span><strong>${item.word}</strong> – ${item.meaning}</span>
-      <button class="pronounce-btn" onclick="speakWord('${item.word.replace(/'/g, "\\'")}')">🔊</button>
+      <div>
+        <button class="pronounce-btn" onclick="speakWord('${item.word.replace(/'/g, "\\'")}')">🔊</button>
+        <button class="delete-btn" onclick="deleteWord(${index})">🗑️</button>
+      </div>
     </li>
   `).join('');
 }
 
-// === Text-to-Speech (Bahasa Inggris) ===
+// === Text-to-Speech ===
 function speakText() {
   const text = document.getElementById('textInput').value.trim();
   if (!text) {
@@ -162,7 +187,7 @@ function speakText() {
     return;
   }
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US'; // Selalu gunakan suara Inggris
+  utterance.lang = 'en-US';
   speechSynthesis.speak(utterance);
 }
 
@@ -196,11 +221,7 @@ function startQuiz() {
 }
 
 function checkAnswer(selected, correct) {
-  if (selected === correct) {
-    alert("✅ Benar!");
-  } else {
-    alert(`❌ Salah. Jawaban benar: ${correct}`);
-  }
+  alert(selected === correct ? "✅ Benar!" : `❌ Salah. Jawaban benar: ${correct}`);
   currentQuestion++;
   if (currentQuestion < quizData.length) {
     startQuiz();
@@ -210,7 +231,7 @@ function checkAnswer(selected, correct) {
   }
 }
 
-// === Render saat halaman dimuat ===
+// === Jalankan saat halaman dimuat ===
 renderWordList();
 </script>
 
