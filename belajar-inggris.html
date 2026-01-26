@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LinguaNote - Belajar Bahasa Inggris</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f8fafc;
+      color: #2d3748;
+      line-height: 1.6;
+    }
+    h1, h2 {
+      text-align: center;
+      margin: 16px 0;
+      color: #2c5282;
+    }
+    h1 { font-size: 2.2em; }
+    .card {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    input, button {
+      padding: 12px;
+      margin: 8px 0;
+      width: 100%;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    button {
+      background: #3182ce;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2c5282; }
+    .pronounce-btn {
+      background: #38a169 !important;
+      padding: 6px 12px !important;
+      font-size: 14px !important;
+      width: auto !important;
+      display: inline-block !important;
+      margin-left: 10px;
+    }
+    ul { list-style: none; }
+    li {
+      padding: 12px 0;
+      border-bottom: 1px solid #edf2f7;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    li:last-child { border-bottom: none; }
+    #textInputSection {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    #textInputSection input,
+    #textInputSection button {
+      flex: 1;
+      min-width: 200px;
+    }
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      .card { padding: 16px; }
+      #textInputSection { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>📘 LinguaNote</h1>
+<p style="text-align:center; color:#718096;">Catat kata & latihan bahasa Inggris</p>
+
+<!-- Tambah Kata -->
+<div class="card">
+  <h2>➕ Tambah Kata Baru</h2>
+  <input type="text" id="newWord" placeholder="Kata dalam bahasa Inggris (misal: apple)" />
+  <input type="text" id="wordMeaning" placeholder="Arti dalam bahasa Indonesia (misal: apel)" />
+  <button onclick="addWord()">Simpan Kata</button>
+</div>
+
+<!-- Daftar Kata -->
+<div class="card">
+  <h2>📚 Daftar Kata Saya (A–Z)</h2>
+  <ul id="wordList"></ul>
+</div>
+
+<!-- Dengarkan Kata -->
+<div class="card">
+  <h2>🔊 Dengarkan Pelafalan</h2>
+  <div id="textInputSection">
+    <input type="text" id="textInput" placeholder="Ketik kata untuk didengarkan (misal: hello)" />
+    <button onclick="speakText()">Dengarkan dalam Bahasa Inggris</button>
+  </div>
+</div>
+
+<!-- Latihan Soal -->
+<div class="card">
+  <h2>🧠 Latihan Soal</h2>
+  <p id="quizQuestion">Klik "Mulai Latihan" untuk mulai!</p>
+  <div id="quizOptions"></div>
+  <button onclick="startQuiz()">Mulai Latihan</button>
+</div>
+
+<script>
+// === Data Kata ===
+let vocabulary = JSON.parse(localStorage.getItem('vocabulary')) || [];
+
+// === Simpan Kata Baru ===
+function addWord() {
+  const word = document.getElementById('newWord').value.trim();
+  const meaning = document.getElementById('wordMeaning').value.trim();
+  if (!word || !meaning) {
+    alert("Harap isi kedua kolom!");
+    return;
+  }
+  vocabulary.push({ word, meaning });
+  // Urutkan A–Z (abaikan huruf besar/kecil)
+  vocabulary.sort((a, b) => 
+    a.word.toLowerCase().localeCompare(b.word.toLowerCase())
+  );
+  localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
+  renderWordList();
+  // Kosongkan input
+  document.getElementById('newWord').value = '';
+  document.getElementById('wordMeaning').value = '';
+}
+
+// === Tampilkan Daftar Kata ===
+function renderWordList() {
+  const list = document.getElementById('wordList');
+  if (vocabulary.length === 0) {
+    list.innerHTML = '<li style="text-align:center;color:#a0aec0;">Belum ada kata tersimpan.</li>';
+    return;
+  }
+  list.innerHTML = vocabulary.map(item => `
+    <li>
+      <span><strong>${item.word}</strong> – ${item.meaning}</span>
+      <button class="pronounce-btn" onclick="speakWord('${item.word.replace(/'/g, "\\'")}')">🔊</button>
+    </li>
+  `).join('');
+}
+
+// === Text-to-Speech (Bahasa Inggris) ===
+function speakText() {
+  const text = document.getElementById('textInput').value.trim();
+  if (!text) {
+    alert("Masukkan teks dulu!");
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US'; // Selalu gunakan suara Inggris
+  speechSynthesis.speak(utterance);
+}
+
+function speakWord(word) {
+  const utterance = new SpeechSynthesisUtterance(word);
+  utterance.lang = 'en-US';
+  speechSynthesis.speak(utterance);
+}
+
+// === Latihan Soal ===
+const quizData = [
+  { q: "What is 'kucing' in English?", a: "cat", options: ["dog", "cat", "bird", "fish"] },
+  { q: "What is the past tense of 'go'?", a: "went", options: ["goed", "gone", "went", "going"] },
+  { q: "Which word is a verb?", a: "run", options: ["happy", "blue", "run", "table"] },
+  { q: "How do you say 'Terima kasih' in English?", a: "Thank you", options: ["Hello", "Goodbye", "Thank you", "Sorry"] },
+  { q: "What does 'book' mean in Indonesian?", a: "buku", options: ["meja", "kursi", "buku", "pensil"] }
+];
+let currentQuestion = 0;
+
+function startQuiz() {
+  if (currentQuestion >= quizData.length) {
+    currentQuestion = 0;
+    alert("Kuis selesai! Mulai dari awal.");
+  }
+  const q = quizData[currentQuestion];
+  document.getElementById('quizQuestion').innerText = q.q;
+  document.getElementById('quizOptions').innerHTML = 
+    q.options.map(opt => 
+      `<button onclick="checkAnswer('${opt}', '${q.a}')">${opt}</button>`
+    ).join('<br>');
+}
+
+function checkAnswer(selected, correct) {
+  if (selected === correct) {
+    alert("✅ Benar!");
+  } else {
+    alert(`❌ Salah. Jawaban benar: ${correct}`);
+  }
+  currentQuestion++;
+  if (currentQuestion < quizData.length) {
+    startQuiz();
+  } else {
+    document.getElementById('quizQuestion').innerText = "Selesai! Klik tombol untuk ulang.";
+    document.getElementById('quizOptions').innerHTML = '';
+  }
+}
+
+// === Render saat halaman dimuat ===
+renderWordList();
+</script>
+
+</body>
+</html>
+
