@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LinguaNote - Belajar Bahasa Inggris</title>
+  <title>LinguaNote - Kosakata Bahasa Inggris</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -70,20 +70,9 @@
       align-items: center;
     }
     li:last-child { border-bottom: none; }
-    #textInputSection {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    #textInputSection input,
-    #textInputSection button {
-      flex: 1;
-      min-width: 200px;
-    }
     @media (max-width: 600px) {
       body { padding: 10px; }
       .card { padding: 16px; }
-      #textInputSection { flex-direction: column; }
       .pronounce-btn, .delete-btn {
         margin: 4px 0 0 6px;
       }
@@ -93,7 +82,7 @@
 <body>
 
 <h1>📘 LinguaNote</h1>
-<p style="text-align:center; color:#718096;">Catat, dengarkan, latihan, dan kelola kosakatamu!</p>
+<p style="text-align:center; color:#718096;">Catat & kelola kosakata bahasa Inggrismu</p>
 
 <!-- Tambah Kata -->
 <div class="card">
@@ -107,23 +96,6 @@
 <div class="card">
   <h2>📚 Daftar Kata Saya (A–Z)</h2>
   <ul id="wordList"></ul>
-</div>
-
-<!-- Dengarkan Kata -->
-<div class="card">
-  <h2>🔊 Dengarkan Pelafalan</h2>
-  <div id="textInputSection">
-    <input type="text" id="textInput" placeholder="Ketik kata untuk didengarkan (misal: hello)" />
-    <button onclick="speakText()">Dengarkan dalam Bahasa Inggris</button>
-  </div>
-</div>
-
-<!-- Latihan Soal -->
-<div class="card">
-  <h2>🧠 Latihan Soal</h2>
-  <p id="quizQuestion">Klik "Mulai Latihan" untuk mulai!</p>
-  <div id="quizOptions"></div>
-  <button onclick="startQuiz()">Mulai Latihan</button>
 </div>
 
 <script>
@@ -179,56 +151,11 @@ function renderWordList() {
   `).join('');
 }
 
-// === Text-to-Speech ===
-function speakText() {
-  const text = document.getElementById('textInput').value.trim();
-  if (!text) {
-    alert("Masukkan teks dulu!");
-    return;
-  }
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  speechSynthesis.speak(utterance);
-}
-
+// === Text-to-Speech (Hanya untuk kata di daftar) ===
 function speakWord(word) {
   const utterance = new SpeechSynthesisUtterance(word);
   utterance.lang = 'en-US';
   speechSynthesis.speak(utterance);
-}
-
-// === Latihan Soal ===
-const quizData = [
-  { q: "What is 'kucing' in English?", a: "cat", options: ["dog", "cat", "bird", "fish"] },
-  { q: "What is the past tense of 'go'?", a: "went", options: ["goed", "gone", "went", "going"] },
-  { q: "Which word is a verb?", a: "run", options: ["happy", "blue", "run", "table"] },
-  { q: "How do you say 'Terima kasih' in English?", a: "Thank you", options: ["Hello", "Goodbye", "Thank you", "Sorry"] },
-  { q: "What does 'book' mean in Indonesian?", a: "buku", options: ["meja", "kursi", "buku", "pensil"] }
-];
-let currentQuestion = 0;
-
-function startQuiz() {
-  if (currentQuestion >= quizData.length) {
-    currentQuestion = 0;
-    alert("Kuis selesai! Mulai dari awal.");
-  }
-  const q = quizData[currentQuestion];
-  document.getElementById('quizQuestion').innerText = q.q;
-  document.getElementById('quizOptions').innerHTML = 
-    q.options.map(opt => 
-      `<button onclick="checkAnswer('${opt}', '${q.a}')">${opt}</button>`
-    ).join('<br>');
-}
-
-function checkAnswer(selected, correct) {
-  alert(selected === correct ? "✅ Benar!" : `❌ Salah. Jawaban benar: ${correct}`);
-  currentQuestion++;
-  if (currentQuestion < quizData.length) {
-    startQuiz();
-  } else {
-    document.getElementById('quizQuestion').innerText = "Selesai! Klik tombol untuk ulang.";
-    document.getElementById('quizOptions').innerHTML = '';
-  }
 }
 
 // === Jalankan saat halaman dimuat ===
