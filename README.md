@@ -1,1 +1,1 @@
-# linguanote
+# KAMUSINGGRISKU
