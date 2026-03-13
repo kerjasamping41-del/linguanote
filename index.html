@@ -90,21 +90,16 @@
       align-items: center;
     }
     ul { list-style: none; }
-    li {
-      padding: 12px 0;
-      border-bottom: 1px solid #edf2f7;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    li:last-child { border-bottom: none; }
     li.word-item {
       background: #fff;
       padding: 12px 16px;
       margin: 4px 0;
       border-radius: 8px;
       border: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
       transition: all 0.2s ease;
     }
     li.word-item:hover {
@@ -213,6 +208,12 @@
       color: #718096;
     }
     
+    .debug-info {
+      font-size: 0.8em;
+      color: #a0aec0;
+      margin-top: 5px;
+    }
+    
     @media (max-width: 600px) {
       body { padding: 10px; }
       .card { padding: 16px; }
@@ -220,9 +221,6 @@
         width: 100%;
         justify-content: flex-end;
         margin-top: 8px;
-      }
-      .pronounce-btn, .edit-btn, .delete-btn {
-        margin: 0 0 0 6px;
       }
       li.word-item {
         flex-direction: column;
@@ -268,28 +266,39 @@
 </div>
 
 <script>
-// === Generate Unique ID (String-based, lebih reliable) ===
+// === Generate Unique ID ===
 function generateId() {
-  return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+  return 'wid_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
 }
 
 // === Data Kosakata ===
-let vocabulary = JSON.parse(localStorage.getItem('vocabulary')) || [];
-let filteredVocabulary = [...vocabulary];
+let vocabulary = [];
+let filteredVocabulary = [];
 let editingId = null;
 
-// === Migrasi: Tambah ID ke data lama ===
-function migrateData() {
-  let needsSave = false;
-  vocabulary.forEach(item => {
-    if (!item.id || typeof item.id !== 'string') {
-      item.id = generateId();
-      needsSave = true;
+// === Load Data dari localStorage ===
+function loadData() {
+  try {
+    const stored = localStorage.getItem('vocabulary');
+    if (stored) {
+      vocabulary = JSON.parse(stored);
+      // Pastikan setiap item punya ID
+      vocabulary.forEach(item => {
+        if (!item.id) {
+          item.id = generateId();
+        }
+      });
+      saveData();
     }
-  });
-  if (needsSave) {
-    localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
+  } catch (e) {
+    vocabulary = [];
   }
+  filteredVocabulary = [...vocabulary];
+}
+
+// === Save Data ke localStorage ===
+function saveData() {
+  localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
 }
 
 // === Tampilkan Notifikasi ===
@@ -325,11 +334,13 @@ function addWord() {
     return;
   }
   
-  vocabulary.push({ word, meaning, id: generateId() });
+  const newItem = { word, meaning, id: generateId() };
+  vocabulary.push(newItem);
   vocabulary.sort((a, b) => 
     a.word.toLowerCase().localeCompare(b.word.toLowerCase())
   );
-  saveAndRender();
+  saveData();
+  filterWords();
   wordInput.value = '';
   meaningInput.value = '';
   wordInput.focus();
@@ -342,7 +353,8 @@ function deleteWord(id) {
   if (item) {
     if (confirm(`Yakin hapus kata: "${item.word}"?`)) {
       vocabulary = vocabulary.filter(v => v.id !== id);
-      saveAndRender();
+      saveData();
+      filterWords();
       showNotification(`Kata "${item.word}" dihapus!`);
     }
   }
@@ -359,14 +371,13 @@ function editWord(id) {
   editingId = id;
   renderWordList();
   
-  // Fokus ke input setelah render selesai
   setTimeout(() => {
     const input = document.getElementById(`editWord-${id}`);
     if (input) {
       input.focus();
       input.select();
     }
-  }, 100);
+  }, 50);
 }
 
 // === Simpan Hasil Edit ===
@@ -401,8 +412,9 @@ function saveEdit(id) {
   vocabulary.sort((a, b) => 
     a.word.toLowerCase().localeCompare(b.word.toLowerCase())
   );
-  saveAndRender();
-  showNotification(`"${oldWord}" berhasil diubah menjadi "${newWord}"!`);
+  saveData();
+  filterWords();
+  showNotification(`"${oldWord}" berhasil diubah!`);
 }
 
 // === Batal Edit ===
@@ -427,19 +439,20 @@ function filterWords() {
   renderWordList();
 }
 
-// === Simpan & Render Ulang ===
-function saveAndRender() {
-  localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
-  filterWords();
-}
-
 // === Dapatkan Huruf Awal ===
 function getLetterGroup(word) {
   const firstChar = word.charAt(0).toUpperCase();
   return /[A-Z]/.test(firstChar) ? firstChar : '#';
 }
 
-// === Tampilkan Daftar Kata dengan Grouping A-Z ===
+// === Escape HTML ===
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// === Tampilkan Daftar Kata ===
 function renderWordList() {
   const list = document.getElementById('wordList');
   const totalCount = document.getElementById('totalCount');
@@ -454,7 +467,6 @@ function renderWordList() {
     return;
   }
   
-  // Group by letter
   const groups = {};
   filteredVocabulary.forEach(item => {
     const letter = getLetterGroup(item.word);
@@ -462,14 +474,12 @@ function renderWordList() {
     groups[letter].push(item);
   });
   
-  // Sort letters
   const sortedLetters = Object.keys(groups).sort((a, b) => {
     if (a === '#') return 1;
     if (b === '#') return -1;
     return a.localeCompare(b);
   });
   
-  // Build HTML
   let html = '';
   sortedLetters.forEach(letter => {
     html += `<li class="letter-section">${letter}</li>`;
@@ -479,28 +489,28 @@ function renderWordList() {
       
       if (isEditing) {
         html += `
-          <li class="word-item editing" data-word-id="${item.id}">
+          <li class="word-item editing">
             <div style="width:100%">
               <input type="text" class="edit-input" id="editWord-${item.id}" value="${escapeHtml(item.word)}" placeholder="Kata (English)" />
               <input type="text" class="edit-input" id="editMeaning-${item.id}" value="${escapeHtml(item.meaning)}" placeholder="Arti (Indonesia)" />
               <div class="save-cancel-btns">
-                <button class="save-btn" data-action="save" data-word-id="${item.id}">✓ Simpan</button>
-                <button class="cancel-btn" data-action="cancel">✕ Batal</button>
+                <button class="save-btn" onclick="saveEdit('${item.id}')">✓ Simpan</button>
+                <button class="cancel-btn" onclick="cancelEdit()">✕ Batal</button>
               </div>
             </div>
           </li>
         `;
       } else {
         html += `
-          <li class="word-item" data-word-id="${item.id}">
+          <li class="word-item">
             <div class="word-content">
               <span class="word-text"><strong>${escapeHtml(item.word)}</strong></span>
               <span class="word-meaning">– ${escapeHtml(item.meaning)}</span>
             </div>
             <div class="action-btns">
-              <button class="pronounce-btn" data-action="speak" data-word="${escapeHtml(item.word)}" title="Dengar pengucapan">🔊</button>
-              <button class="edit-btn" data-action="edit" data-word-id="${item.id}" title="Edit kata">✏️</button>
-              <button class="delete-btn" data-action="delete" data-word-id="${item.id}" title="Hapus kata">🗑️</button>
+              <button class="pronounce-btn" onclick="speakWord('${escapeHtml(item.word).replace(/'/g, "\\'")}')">🔊</button>
+              <button class="edit-btn" onclick="editWord('${item.id}')">✏️</button>
+              <button class="delete-btn" onclick="deleteWord('${item.id}')">🗑️</button>
             </div>
           </li>
         `;
@@ -509,45 +519,6 @@ function renderWordList() {
   });
   
   list.innerHTML = html;
-  
-  // Attach event listeners setelah render
-  attachEventListeners();
-}
-
-// === Escape HTML untuk mencegah XSS ===
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// === Event Delegation (FIX UTAMA - tidak pakai inline onclick) ===
-function attachEventListeners() {
-  const wordList = document.getElementById('wordList');
-  
-  // Hapus listener lama (clone node untuk remove semua listener)
-  const newWordList = wordList.cloneNode(true);
-  wordList.parentNode.replaceChild(newWordList, wordList);
-  
-  // Attach click listener
-  newWordList.addEventListener('click', function(e) {
-    const target = e.target;
-    const action = target.getAttribute('data-action');
-    const wordId = target.getAttribute('data-word-id');
-    const word = target.getAttribute('data-word');
-    
-    if (action === 'speak' && word) {
-      speakWord(word);
-    } else if (action === 'edit' && wordId) {
-      editWord(wordId);
-    } else if (action === 'delete' && wordId) {
-      deleteWord(wordId);
-    } else if (action === 'save' && wordId) {
-      saveEdit(wordId);
-    } else if (action === 'cancel') {
-      cancelEdit();
-    }
-  });
 }
 
 // === Text-to-Speech ===
@@ -560,7 +531,7 @@ function speakWord(word) {
 }
 
 // === Keyboard Shortcuts ===
-function handleKeyboardShortcuts(e) {
+document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && editingId) {
     const activeEl = document.activeElement;
     if (activeEl && activeEl.classList.contains('edit-input')) {
@@ -572,12 +543,7 @@ function handleKeyboardShortcuts(e) {
     e.preventDefault();
     cancelEdit();
   }
-}
-
-// === Inisialisasi ===
-migrateData();
-renderWordList();
-document.addEventListener('keypress', handleKeyboardShortcuts);
+});
 
 // === Shortcut Enter untuk form tambah ===
 document.getElementById('newWord').addEventListener('keypress', function(e) {
@@ -586,6 +552,10 @@ document.getElementById('newWord').addEventListener('keypress', function(e) {
 document.getElementById('wordMeaning').addEventListener('keypress', function(e) {
   if (e.key === 'Enter') addWord();
 });
+
+// === Inisialisasi ===
+loadData();
+renderWordList();
 </script>
 
 </body>
@@ -594,18 +564,9 @@ document.getElementById('wordMeaning').addEventListener('keypress', function(e) 
 
 
               <script>
-                              // Sebelum (BUG):
-<button onclick="editWord(1234567890)">✏️</button>
-
-// Sesudah (FIX):
-<button data-action="edit" data-word-id="id_abc123_xyz">✏️</button>
-
-// Semua click ditangani di satu tempat:
-wordList.addEventListener('click', function(e) {
-  const action = e.target.getAttribute('data-action');
-  const wordId = e.target.getAttribute('data-word-id');
-  if (action === 'edit') editWord(wordId);
-});
+                              console.log('Edit ID:', id);
+console.log('Found item:', item);
+console.log('All vocabulary:', vocabulary);
 
 
               </script>
