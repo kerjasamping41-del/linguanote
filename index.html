@@ -95,6 +95,10 @@
       background: #f7fafc;
       border-color: #3182ce;
     }
+    li.word-item.editing {
+      border-color: #ed8936;
+      background: #fffaf0;
+    }
     
     .search-box {
       margin: 15px 0;
@@ -166,6 +170,24 @@
       color: #3182ce;
     }
     
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+    .notification.success { background: #38a169; }
+    .notification.error { background: #e53e3e; }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
     @media (max-width: 600px) {
       body { padding: 10px; }
       .card { padding: 16px; }
@@ -224,13 +246,41 @@
 // === Data Kosakata ===
 let vocabulary = JSON.parse(localStorage.getItem('vocabulary')) || [];
 let filteredVocabulary = [...vocabulary];
+let editingId = null; // Track which item is being edited
+
+// === Migrasi: Tambah ID ke data lama yang tidak punya ID ===
+function migrateData() {
+  let needsSave = false;
+  vocabulary.forEach(item => {
+    if (!item.id) {
+      item.id = Date.now() + Math.random();
+      needsSave = true;
+    }
+  });
+  if (needsSave) {
+    localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
+  }
+}
+
+// === Tampilkan Notifikasi ===
+function showNotification(message, type = 'success') {
+  const existing = document.querySelector('.notification');
+  if (existing) existing.remove();
+  
+  const notif = document.createElement('div');
+  notif.className = `notification ${type}`;
+  notif.textContent = message;
+  document.body.appendChild(notif);
+  
+  setTimeout(() => notif.remove(), 3000);
+}
 
 // === Simpan Kata Baru ===
 function addWord() {
   const word = document.getElementById('newWord').value.trim();
   const meaning = document.getElementById('wordMeaning').value.trim();
   if (!word || !meaning) {
-    alert("Harap isi kedua kolom!");
+    showNotification("Harap isi kedua kolom!", "error");
     return;
   }
   
@@ -238,11 +288,11 @@ function addWord() {
     item.word.toLowerCase() === word.toLowerCase()
   );
   if (exists) {
-    alert(`Kata "${word}" sudah ada dalam daftar!`);
+    showNotification(`Kata "${word}" sudah ada dalam daftar!`, "error");
     return;
   }
   
-  vocabulary.push({ word, meaning, id: Date.now() });
+  vocabulary.push({ word, meaning, id: Date.now() + Math.random() });
   vocabulary.sort((a, b) => 
     a.word.toLowerCase().localeCompare(b.word.toLowerCase())
   );
@@ -250,6 +300,7 @@ function addWord() {
   document.getElementById('newWord').value = '';
   document.getElementById('wordMeaning').value = '';
   document.getElementById('newWord').focus();
+  showNotification("Kata berhasil ditambahkan!");
 }
 
 // === Hapus Kata ===
@@ -258,41 +309,44 @@ function deleteWord(id) {
   if (item && confirm(`Yakin hapus kata: "${item.word}"?`)) {
     vocabulary = vocabulary.filter(v => v.id !== id);
     saveAndRender();
+    showNotification(`Kata "${item.word}" dihapus!`);
   }
 }
 
 // === Edit Kata ===
 function editWord(id) {
   const item = vocabulary.find(v => v.id === id);
-  if (!item) return;
+  if (!item) {
+    showNotification("Kata tidak ditemukan!", "error");
+    return;
+  }
   
-  const li = document.querySelector(`li[data-id="${id}"]`);
-  if (!li) return;
+  editingId = id;
+  renderWordList();
   
-  li.innerHTML = `
-    <div style="width:100%">
-      <input type="text" class="edit-input" id="editWord-${id}" value="${item.word}" placeholder="Kata (English)" />
-      <input type="text" class="edit-input" id="editMeaning-${id}" value="${item.meaning}" placeholder="Arti (Indonesia)" />
-      <div class="save-cancel-btns">
-        <button class="save-btn" onclick="saveEdit(${id})">✓ Simpan</button>
-        <button class="cancel-btn" onclick="renderWordList()">✕ Batal</button>
-      </div>
-    </div>
-  `;
-  
-  document.getElementById(`editWord-${id}`).focus();
+  // Fokus ke input setelah render
+  setTimeout(() => {
+    const input = document.getElementById(`editWord-${id}`);
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, 50);
 }
 
 // === Simpan Hasil Edit ===
 function saveEdit(id) {
   const item = vocabulary.find(v => v.id === id);
-  if (!item) return;
+  if (!item) {
+    showNotification("Kata tidak ditemukan!", "error");
+    return;
+  }
   
   const newWord = document.getElementById(`editWord-${id}`).value.trim();
   const newMeaning = document.getElementById(`editMeaning-${id}`).value.trim();
   
   if (!newWord || !newMeaning) {
-    alert("Harap isi kedua kolom!");
+    showNotification("Harap isi kedua kolom!", "error");
     return;
   }
   
@@ -300,16 +354,24 @@ function saveEdit(id) {
     v.id !== id && v.word.toLowerCase() === newWord.toLowerCase()
   );
   if (exists) {
-    alert(`Kata "${newWord}" sudah ada dalam daftar!`);
+    showNotification(`Kata "${newWord}" sudah ada dalam daftar!`, "error");
     return;
   }
   
+  const oldWord = item.word;
   item.word = newWord;
   item.meaning = newMeaning;
   vocabulary.sort((a, b) => 
     a.word.toLowerCase().localeCompare(b.word.toLowerCase())
   );
   saveAndRender();
+  showNotification(`"${oldWord}" berhasil diubah!`);
+}
+
+// === Batal Edit ===
+function cancelEdit() {
+  editingId = null;
+  renderWordList();
 }
 
 // === Filter / Pencarian ===
@@ -373,16 +435,33 @@ function renderWordList() {
     html += `<li class="letter-section">${letter}</li>`;
     
     groups[letter].forEach(item => {
-      html += `
-        <li class="word-item" data-id="${item.id}">
-          <span><strong>${item.word}</strong> – ${item.meaning}</span>
-          <div class="action-btns">
-            <button class="pronounce-btn" onclick="speakWord('${item.word.replace(/'/g, "\\'")}')">🔊</button>
-            <button class="edit-btn" onclick="editWord(${item.id})">✏️</button>
-            <button class="delete-btn" onclick="deleteWord(${item.id})">🗑️</button>
-          </div>
-        </li>
-      `;
+      const isEditing = editingId === item.id;
+      
+      if (isEditing) {
+        html += `
+          <li class="word-item editing" data-id="${item.id}">
+            <div style="width:100%">
+              <input type="text" class="edit-input" id="editWord-${item.id}" value="${item.word}" placeholder="Kata (English)" />
+              <input type="text" class="edit-input" id="editMeaning-${item.id}" value="${item.meaning}" placeholder="Arti (Indonesia)" />
+              <div class="save-cancel-btns">
+                <button class="save-btn" onclick="saveEdit(${item.id})">✓ Simpan</button>
+                <button class="cancel-btn" onclick="cancelEdit()">✕ Batal</button>
+              </div>
+            </div>
+          </li>
+        `;
+      } else {
+        html += `
+          <li class="word-item" data-id="${item.id}">
+            <span><strong>${item.word}</strong> – ${item.meaning}</span>
+            <div class="action-btns">
+              <button class="pronounce-btn" onclick="speakWord('${item.word.replace(/'/g, "\\'")}')">🔊</button>
+              <button class="edit-btn" onclick="editWord(${item.id})">✏️</button>
+              <button class="delete-btn" onclick="deleteWord(${item.id})">🗑️</button>
+            </div>
+          </li>
+        `;
+      }
     });
   });
   
@@ -399,6 +478,7 @@ function speakWord(word) {
 }
 
 // === Inisialisasi ===
+migrateData();
 renderWordList();
 
 // === Shortcut Enter ===
@@ -407,6 +487,19 @@ document.getElementById('newWord').addEventListener('keypress', function(e) {
 });
 document.getElementById('wordMeaning').addEventListener('keypress', function(e) {
   if (e.key === 'Enter') addWord();
+});
+
+// === Enter untuk save saat edit ===
+document.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter' && editingId) {
+    const activeEl = document.activeElement;
+    if (activeEl && activeEl.classList.contains('edit-input')) {
+      saveEdit(editingId);
+    }
+  }
+  if (e.key === 'Escape' && editingId) {
+    cancelEdit();
+  }
 });
 </script>
 
