@@ -53,6 +53,14 @@
       display: inline-block !important;
       margin-left: 8px;
     }
+    .edit-btn {
+      background: #ed8936 !important;
+      padding: 6px 10px !important;
+      font-size: 14px !important;
+      width: auto !important;
+      display: inline-block !important;
+      margin-left: 6px;
+    }
     .delete-btn {
       background: #e53e3e !important;
       padding: 6px 10px !important;
@@ -61,6 +69,11 @@
       display: inline-block !important;
       margin-left: 6px;
     }
+    .action-btns {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
     ul { list-style: none; }
     li {
       padding: 12px 0;
@@ -68,13 +81,108 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
     }
     li:last-child { border-bottom: none; }
+    li.word-item {
+      background: #fff;
+      padding: 12px 16px;
+      margin: 4px 0;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    li.word-item:hover {
+      background: #f7fafc;
+      border-color: #3182ce;
+    }
+    
+    .search-box {
+      margin: 15px 0;
+      position: relative;
+    }
+    .search-box input {
+      padding-left: 40px;
+      background: #f7fafc;
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #a0aec0;
+      font-size: 18px;
+    }
+    
+    .letter-section {
+      margin: 24px 0 12px;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+      border-left: 5px solid #3182ce;
+      border-radius: 6px;
+      font-weight: bold;
+      color: #2c5282;
+      font-size: 1.2em;
+      letter-spacing: 2px;
+    }
+    .no-results {
+      text-align: center;
+      color: #a0aec0;
+      padding: 40px 20px;
+      font-style: italic;
+      font-size: 1.1em;
+    }
+    
+    .edit-input {
+      padding: 8px;
+      margin: 4px 0;
+      border: 2px solid #63b3ed;
+      border-radius: 6px;
+      font-size: 15px;
+      width: 100%;
+    }
+    .save-cancel-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .save-btn {
+      background: #38a169 !important;
+      padding: 8px 16px !important;
+      width: auto !important;
+    }
+    .cancel-btn {
+      background: #718096 !important;
+      padding: 8px 16px !important;
+      width: auto !important;
+    }
+    
+    .stats {
+      text-align: center;
+      color: #718096;
+      font-size: 0.9em;
+      margin-bottom: 15px;
+    }
+    .stats strong {
+      color: #3182ce;
+    }
+    
     @media (max-width: 600px) {
       body { padding: 10px; }
       .card { padding: 16px; }
-      .pronounce-btn, .delete-btn {
-        margin: 4px 0 0 6px;
+      .action-btns {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 8px;
+      }
+      .pronounce-btn, .edit-btn, .delete-btn {
+        margin: 0 0 0 6px;
+      }
+      li.word-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .action-btns {
+        margin-top: 10px;
       }
     }
   </style>
@@ -95,12 +203,27 @@
 <!-- Daftar Kata -->
 <div class="card">
   <h2>📚 Daftar Kata Saya (A–Z)</h2>
+  
+  <p class="stats">Total: <strong id="totalCount">0</strong> kata</p>
+  
+  <!-- 🔍 Pencarian -->
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input 
+      type="text" 
+      id="searchInput" 
+      placeholder="Cari kata atau arti..." 
+      oninput="filterWords()"
+    />
+  </div>
+  
   <ul id="wordList"></ul>
 </div>
 
 <script>
 // === Data Kosakata ===
 let vocabulary = JSON.parse(localStorage.getItem('vocabulary')) || [];
+let filteredVocabulary = [...vocabulary];
 
 // === Simpan Kata Baru ===
 function addWord() {
@@ -110,56 +233,181 @@ function addWord() {
     alert("Harap isi kedua kolom!");
     return;
   }
-  vocabulary.push({ word, meaning });
+  
+  const exists = vocabulary.some(item => 
+    item.word.toLowerCase() === word.toLowerCase()
+  );
+  if (exists) {
+    alert(`Kata "${word}" sudah ada dalam daftar!`);
+    return;
+  }
+  
+  vocabulary.push({ word, meaning, id: Date.now() });
   vocabulary.sort((a, b) => 
     a.word.toLowerCase().localeCompare(b.word.toLowerCase())
   );
   saveAndRender();
   document.getElementById('newWord').value = '';
   document.getElementById('wordMeaning').value = '';
+  document.getElementById('newWord').focus();
 }
 
 // === Hapus Kata ===
-function deleteWord(index) {
-  if (confirm(`Yakin hapus kata: "${vocabulary[index].word}"?`)) {
-    vocabulary.splice(index, 1);
+function deleteWord(id) {
+  const item = vocabulary.find(v => v.id === id);
+  if (item && confirm(`Yakin hapus kata: "${item.word}"?`)) {
+    vocabulary = vocabulary.filter(v => v.id !== id);
     saveAndRender();
   }
+}
+
+// === Edit Kata ===
+function editWord(id) {
+  const item = vocabulary.find(v => v.id === id);
+  if (!item) return;
+  
+  const li = document.querySelector(`li[data-id="${id}"]`);
+  if (!li) return;
+  
+  li.innerHTML = `
+    <div style="width:100%">
+      <input type="text" class="edit-input" id="editWord-${id}" value="${item.word}" placeholder="Kata (English)" />
+      <input type="text" class="edit-input" id="editMeaning-${id}" value="${item.meaning}" placeholder="Arti (Indonesia)" />
+      <div class="save-cancel-btns">
+        <button class="save-btn" onclick="saveEdit(${id})">✓ Simpan</button>
+        <button class="cancel-btn" onclick="renderWordList()">✕ Batal</button>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById(`editWord-${id}`).focus();
+}
+
+// === Simpan Hasil Edit ===
+function saveEdit(id) {
+  const item = vocabulary.find(v => v.id === id);
+  if (!item) return;
+  
+  const newWord = document.getElementById(`editWord-${id}`).value.trim();
+  const newMeaning = document.getElementById(`editMeaning-${id}`).value.trim();
+  
+  if (!newWord || !newMeaning) {
+    alert("Harap isi kedua kolom!");
+    return;
+  }
+  
+  const exists = vocabulary.some(v => 
+    v.id !== id && v.word.toLowerCase() === newWord.toLowerCase()
+  );
+  if (exists) {
+    alert(`Kata "${newWord}" sudah ada dalam daftar!`);
+    return;
+  }
+  
+  item.word = newWord;
+  item.meaning = newMeaning;
+  vocabulary.sort((a, b) => 
+    a.word.toLowerCase().localeCompare(b.word.toLowerCase())
+  );
+  saveAndRender();
+}
+
+// === Filter / Pencarian ===
+function filterWords() {
+  const query = document.getElementById('searchInput').value.toLowerCase().trim();
+  
+  if (!query) {
+    filteredVocabulary = [...vocabulary];
+  } else {
+    filteredVocabulary = vocabulary.filter(item => 
+      item.word.toLowerCase().includes(query) || 
+      item.meaning.toLowerCase().includes(query)
+    );
+  }
+  
+  renderWordList();
 }
 
 // === Simpan & Render Ulang ===
 function saveAndRender() {
   localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
-  renderWordList();
+  filterWords();
 }
 
-// === Tampilkan Daftar Kata ===
+// === Dapatkan Huruf Awal ===
+function getLetterGroup(word) {
+  const firstChar = word.charAt(0).toUpperCase();
+  return /[A-Z]/.test(firstChar) ? firstChar : '#';
+}
+
+// === Tampilkan Daftar Kata dengan Grouping A-Z ===
 function renderWordList() {
   const list = document.getElementById('wordList');
-  if (vocabulary.length === 0) {
-    list.innerHTML = '<li style="text-align:center;color:#a0aec0;">Belum ada kata tersimpan.</li>';
+  const totalCount = document.getElementById('totalCount');
+  
+  totalCount.textContent = vocabulary.length;
+  
+  if (filteredVocabulary.length === 0) {
+    const msg = vocabulary.length === 0 
+      ? 'Belum ada kata tersimpan. Mulai tambahkan kosakata baru! 📝' 
+      : 'Tidak ada hasil yang cocok dengan pencarian.';
+    list.innerHTML = `<li class="no-results">${msg}</li>`;
     return;
   }
-  list.innerHTML = vocabulary.map((item, index) => `
-    <li>
-      <span><strong>${item.word}</strong> – ${item.meaning}</span>
-      <div>
-        <button class="pronounce-btn" onclick="speakWord('${item.word.replace(/'/g, "\\'")}')">🔊</button>
-        <button class="delete-btn" onclick="deleteWord(${index})">🗑️</button>
-      </div>
-    </li>
-  `).join('');
+  
+  const groups = {};
+  filteredVocabulary.forEach(item => {
+    const letter = getLetterGroup(item.word);
+    if (!groups[letter]) groups[letter] = [];
+    groups[letter].push(item);
+  });
+  
+  const sortedLetters = Object.keys(groups).sort((a, b) => {
+    if (a === '#') return 1;
+    if (b === '#') return -1;
+    return a.localeCompare(b);
+  });
+  
+  let html = '';
+  sortedLetters.forEach(letter => {
+    html += `<li class="letter-section">${letter}</li>`;
+    
+    groups[letter].forEach(item => {
+      html += `
+        <li class="word-item" data-id="${item.id}">
+          <span><strong>${item.word}</strong> – ${item.meaning}</span>
+          <div class="action-btns">
+            <button class="pronounce-btn" onclick="speakWord('${item.word.replace(/'/g, "\\'")}')">🔊</button>
+            <button class="edit-btn" onclick="editWord(${item.id})">✏️</button>
+            <button class="delete-btn" onclick="deleteWord(${item.id})">🗑️</button>
+          </div>
+        </li>
+      `;
+    });
+  });
+  
+  list.innerHTML = html;
 }
 
-// === Text-to-Speech (Hanya untuk kata di daftar) ===
+// === Text-to-Speech ===
 function speakWord(word) {
+  speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(word);
   utterance.lang = 'en-US';
+  utterance.rate = 0.9;
   speechSynthesis.speak(utterance);
 }
 
-// === Jalankan saat halaman dimuat ===
+// === Inisialisasi ===
 renderWordList();
+
+// === Shortcut Enter ===
+document.getElementById('newWord').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') document.getElementById('wordMeaning').focus();
+});
+document.getElementById('wordMeaning').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') addWord();
+});
 </script>
 
 </body>
